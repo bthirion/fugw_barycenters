@@ -1,2 +1,2 @@
 # fugw_barycenters
-Experimental work on FUGX barycenters
+Experimental work on FUGW barycenters
