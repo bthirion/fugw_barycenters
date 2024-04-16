@@ -102,7 +102,8 @@ fugw_barycenter.fit(
     [
         geometry_embedding @ geometry_embedding.T
     ],  # TODO : add low-rank approximation
-    nits_barycenter=5,
+    nits_barycenter=2,
+    solver_params={"nits_bcd": 2, "nits_uot": 10},
     device=device,
-    verbose=True,
+    verbose=False,
 )
