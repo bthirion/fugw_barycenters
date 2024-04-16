@@ -14,13 +14,13 @@ from fugw.mappings.barycenter import FUGWBarycenter
 path = Path("/data/parietal/store/data/HCP900/glm/fsaverage5/")
 assert path.exists()
 
-N_SUBJECTS = 50
+N_SUBJECTS = 10
 DEVICE = "cuda"
 # ALPHA_LIST = [0, 0.1, 0.25, 0.5, 0.75, 0.9, 1]
 ALPHA_LIST = [0.5]
-RHO = [1]
+RHO = [1e6]
 # EPS_LIST = [1e-4, 1e-3, 1e-2, 1e-1]
-EPS_LIST = [1e-3, 1e-2, 1e-1]
+EPS_LIST = [1e-2]
 
 # Get the list of subjects
 subjects = [
@@ -28,15 +28,17 @@ subjects = [
     for x in path.iterdir()
 ]
 subjects = subjects[:N_SUBJECTS]
-tasks = [
-    "EMOTION",
-    "GAMBLING",
-    "LANGUAGE",
-    "MOTOR",
-    "RELATIONAL",
-    "SOCIAL",
-    "WM",
-]
+interest = {
+    'LANGUAGE': ['MATH-STORY'],
+    'WM': ['2BK-0BK', 'BODY-AVG', 'PLACE-AVG', 'TOOL-AVG', 'FACE-AVG'],
+    'EMOTION': ['SHAPES-FACES'],
+    'SOCIAL': ['TOM-RANDOM'],
+    'RELATIONAL': ['REL-MATCH'],
+    'GAMBLING': ['PUNISH-REWARD'],
+    'MOTOR': ['RH-AVG', 'RF-AVG', 'T-AVG', 'LH-AVG', 'LF-AVG']
+}
+tasks = list(interest.keys())
+hemi = 'left'
 
 # Load gifti files
 features = list()
@@ -44,38 +46,24 @@ for subject in tqdm(subjects):
     z_maps = list()
     for task in tasks:
         current_path = path / subject / task / "level2" / "z_maps"
-        filnames_z_maps = list(current_path.glob("*.gii"))
-        # keep only left hemisphere
-        filnames_z_maps = [x for x in filnames_z_maps if "lh" in x.name]
-        for filename in filnames_z_maps:
-            tmp = nib.load(filename)
-            z_maps.append(tmp.darrays[0].data)
-
+        for contrast in interest[task]:
+            z_map = nib.load(current_path / f"z_{contrast}_{hemi[0]}h.gii").agg_data()
+            z_maps.append(z_map)
     features.append(np.array(z_maps))
-
 features = torch.tensor(np.array(features))
 
 # Compute the geodesic distance matrix
-
-
-def compute_geometry_from_mesh(mesh_path):
-    """Util function to compute matrix of geodesic distances of a mesh."""
-    (coordinates, triangles) = surface.load_surf_mesh(mesh_path)
-    geometry = compute_lmds_mesh(coordinates, triangles, k=20)
-    geometry = torch.cdist(geometry, geometry)
-    return geometry
-
-
 fsaverage = datasets.fetch_surf_fsaverage(mesh="fsaverage5")
-geometry = compute_geometry_from_mesh(fsaverage.pial_left)
+(coordinates, triangles) = surface.load_surf_mesh(fsaverage.pial_left)
+geometry = compute_lmds_mesh(coordinates, triangles, k=20)
+geometry = torch.cdist(geometry, geometry)
 
 # Normalize features and geometries
-features_normalized = features / torch.linalg.norm(
-    features, axis=1, keepdims=True
-)
+features = features.to(DEVICE)
+geometry = geometry.to(DEVICE)
+features_norm_factor = torch.max(torch.abs(features))
+features_normalized = features / features_norm_factor
 geometry_normalized = geometry / torch.max(geometry)
-features_normalized = features_normalized.to(DEVICE)
-geometry_normalized = geometry_normalized.to(DEVICE)
 
 # Compute fugw barycenter
 d = features_normalized.shape[-1]
@@ -121,14 +109,30 @@ for alpha, rho, eps in itertools.product(ALPHA_LIST, RHO, EPS_LIST):
         verbose=False
     )
 
-    # Save the barycenter
-    barycenter_path_hyp = barycenter_path / f"alpha_{alpha}__rho_{rho}__eps_{eps}"
-    barycenter_path_hyp.mkdir(exist_ok=True)
     barycenter_weights = barycenter_weights.cpu().numpy()
+    barycenter_features = barycenter_features * features_norm_factor
     barycenter_features = barycenter_features.cpu().numpy()
     barycenter_geometry = barycenter_geometry.cpu().numpy()
+
+    # Save barycenter gifti files
+    barycenter_path_hyp = barycenter_path / f"alpha_{alpha}_rho_{rho}_eps_{eps}"
+    idx = 0
+    for task in tasks:
+        task_path = barycenter_path_hyp / task / "level2" / "z_maps"
+        task_path.mkdir(exist_ok=True, parents=True)
+        for contrast in interest[task]:
+            barycenter_feature = barycenter_features[idx]
+            barycenter_feature = nib.gifti.GiftiImage(
+                darrays=[nib.gifti.GiftiDataArray(barycenter_feature)]
+            )
+            nib.save(
+                barycenter_feature,
+                task_path / f"z_{contrast}_{hemi[0]}h.gii"
+            )
+            idx += 1
+
+    # Save barycenter geometry
     np.save(barycenter_path_hyp / "weights.npy", barycenter_weights)
-    np.save(barycenter_path_hyp / "features.npy", barycenter_features)
     np.save(barycenter_path_hyp / "geometry.npy", barycenter_geometry)
 
     print(f"Elapsed time: {time.time() - start_time:.2f} seconds")
