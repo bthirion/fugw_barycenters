@@ -74,6 +74,24 @@ barycenter_path.mkdir(exist_ok=True)
 
 print("Total number of combinations: ", len(ALPHA_LIST) * len(RHO) * len(EPS_LIST))
 
+# Compute and save euclidean barycenter gifti file
+barycenter_path_hyp = barycenter_path / "euclidean"
+euclidean_barycenter_features = torch.mean(features_normalized, dim=0)
+idx = 0
+for task in tasks:
+    task_path = barycenter_path_hyp / task / "level2" / "z_maps"
+    task_path.mkdir(exist_ok=True, parents=True)
+    for contrast in interest[task]:
+        barycenter_feature = euclidean_barycenter_features[idx].cpu().numpy()
+        barycenter_feature = nib.gifti.GiftiImage(
+            darrays=[nib.gifti.GiftiDataArray(barycenter_feature)]
+        )
+        nib.save(
+            barycenter_feature,
+            task_path / f"z_{contrast}_{hemi[0]}h.gii"
+        )
+        idx += 1
+
 for alpha, rho, eps in itertools.product(ALPHA_LIST, RHO, EPS_LIST):
     print()
     start_time = time.time()
@@ -83,8 +101,6 @@ for alpha, rho, eps in itertools.product(ALPHA_LIST, RHO, EPS_LIST):
         rho=rho,
         eps=eps
     )
-
-    init_barycenter_features = torch.mean(features_normalized, dim=0)
 
     (
         barycenter_weights,
@@ -97,7 +113,7 @@ for alpha, rho, eps in itertools.product(ALPHA_LIST, RHO, EPS_LIST):
         weights_list=weights_list,
         features_list=features_list,
         geometry_list=[geometry_normalized],
-        init_barycenter_features=init_barycenter_features,
+        init_barycenter_features=euclidean_barycenter_features,
         nits_barycenter=3,
         solver='mm',
         solver_params={
