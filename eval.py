@@ -91,5 +91,6 @@ for task in tasks:
         idx += 1
 df = pd.DataFrame(data, columns=['Barycenter', 'Task', 'val'])
 df.pivot(columns='Barycenter', values='val', index='Task').plot(kind='bar')
+plt.ylabel('Mean Euclidean distance to barycenter')
 
 # %%
