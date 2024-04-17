@@ -91,9 +91,9 @@ for task in tasks:
     for i in range(len(features_task)):
         features_task_subject = features_task[i]
         dist_euc = scipy.spatial.distance.cdist(
-            features_task_subject, barycenter_euc_task)
+            features_task_subject, barycenter_euc_task, metric='correlation')
         dist_fugw = scipy.spatial.distance.cdist(
-            features_task_subject, barycenter_fugw_task)
+            features_task_subject, barycenter_fugw_task, metric='correlation')
         predictions_euc.append(np.argmin(dist_euc, axis=1))
         predictions_fugw.append(np.argmin(dist_fugw, axis=1))
         labels.append(np.arange(features_task_subject.shape[0]))
