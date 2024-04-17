@@ -26,14 +26,24 @@ subjects = [
     for x in path.iterdir()
 ]
 subjects = subjects[:N_SUBJECTS]
+# interest = {
+#     'LANGUAGE': ['MATH-STORY'],
+#     'WM': ['2BK-0BK', 'BODY-AVG', 'PLACE-AVG', 'TOOL-AVG', 'FACE-AVG'],
+#     'EMOTION': ['SHAPES-FACES'],
+#     'SOCIAL': ['TOM-RANDOM'],
+#     'RELATIONAL': ['REL-MATCH'],
+#     'GAMBLING': ['PUNISH-REWARD'],
+#     'MOTOR': ['RH-AVG', 'RF-AVG', 'T-AVG', 'LH-AVG', 'LF-AVG']
+# }
 interest = {
-    'LANGUAGE': ['MATH-STORY'],
-    'WM': ['2BK-0BK', 'BODY-AVG', 'PLACE-AVG', 'TOOL-AVG', 'FACE-AVG'],
-    'EMOTION': ['SHAPES-FACES'],
-    'SOCIAL': ['TOM-RANDOM'],
-    'RELATIONAL': ['REL-MATCH'],
-    'GAMBLING': ['PUNISH-REWARD'],
-    'MOTOR': ['RH-AVG', 'RF-AVG', 'T-AVG', 'LH-AVG', 'LF-AVG']
+    'LANGUAGE': ['MATH', 'STORY'],
+    'WM': ['2BK_BODY', '2BK_PLACE', '2BK_TOOL', '2BK_FACE',
+           '0BK_BODY', '0BK_PLACE', '0BK_TOOL', '0BK_FACE'],
+    'EMOTION': ['SHAPES', 'FACES'],
+    'SOCIAL': ['TOM', 'RANDOM'],
+    'RELATIONAL': ['REL', 'MATCH'],
+    'GAMBLING': ['PUNISH', 'REWARD'],
+    'MOTOR': ['RH', 'RF', 'T', 'LH', 'LF']
 }
 tasks = list(interest.keys())
 hemi = 'left'
