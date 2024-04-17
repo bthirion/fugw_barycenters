@@ -16,10 +16,8 @@ assert path.exists()
 
 N_SUBJECTS = 10
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
-# ALPHA_LIST = [0, 0.1, 0.25, 0.5, 0.75, 0.9, 1]
 ALPHA_LIST = [0.5]
 RHO = [1]
-# EPS_LIST = [1e-4, 1e-3, 1e-2, 1e-1]
 EPS_LIST = [1e-4]
 
 # Get the list of subjects
