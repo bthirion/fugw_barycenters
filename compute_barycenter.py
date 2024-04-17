@@ -15,12 +15,12 @@ path = Path("/data/parietal/store/data/HCP900/glm/fsaverage5/")
 assert path.exists()
 
 N_SUBJECTS = 10
-DEVICE = "cuda"
+DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 # ALPHA_LIST = [0, 0.1, 0.25, 0.5, 0.75, 0.9, 1]
 ALPHA_LIST = [0.5]
-RHO = [1e6]
+RHO = [1]
 # EPS_LIST = [1e-4, 1e-3, 1e-2, 1e-1]
-EPS_LIST = [1e-2]
+EPS_LIST = [1e-4]
 
 # Get the list of subjects
 subjects = [
@@ -86,6 +86,8 @@ for alpha, rho, eps in itertools.product(ALPHA_LIST, RHO, EPS_LIST):
         eps=eps
     )
 
+    init_barycenter_features = torch.mean(features_normalized, dim=0)
+
     (
         barycenter_weights,
         barycenter_features,
@@ -97,10 +99,11 @@ for alpha, rho, eps in itertools.product(ALPHA_LIST, RHO, EPS_LIST):
         weights_list=weights_list,
         features_list=features_list,
         geometry_list=[geometry_normalized],
+        init_barycenter_features=init_barycenter_features,
         nits_barycenter=3,
         solver='mm',
         solver_params={
-            'nits_bcd': 5,
+            'nits_bcd': 3,
             'nits_uot': 50,
             'eval_bcd': 1,
             'eval_uot': 1,
@@ -110,7 +113,6 @@ for alpha, rho, eps in itertools.product(ALPHA_LIST, RHO, EPS_LIST):
     )
 
     barycenter_weights = barycenter_weights.cpu().numpy()
-    barycenter_features = barycenter_features * features_norm_factor
     barycenter_features = barycenter_features.cpu().numpy()
     barycenter_geometry = barycenter_geometry.cpu().numpy()
 
