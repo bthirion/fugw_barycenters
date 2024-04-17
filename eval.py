@@ -1,4 +1,4 @@
-#%%
+# %%
 import matplotlib.pyplot as plt
 import nibabel as nib
 import numpy as np
@@ -6,7 +6,7 @@ from pathlib import Path
 import pandas as pd
 from tqdm import tqdm
 
-#%%
+# %%
 path = Path("/data/parietal/store/data/HCP900/glm/fsaverage5/")
 assert path.exists()
 
@@ -34,7 +34,7 @@ interest = {
 tasks = list(interest.keys())
 hemi = 'left'
 
-#%%
+# %%
 # Load subject gifti files
 features = list()
 for subject in tqdm(subjects):
@@ -49,7 +49,7 @@ features = np.array(features)
 features_norm_factor = np.max(np.abs(features))
 features_normalized = features / features_norm_factor
 
-#%%
+# %%
 # Load euclidean and fugw barycenters
 barycenter_path = Path("barycenters")
 assert barycenter_path.exists()
@@ -74,12 +74,24 @@ barycenter_euc = barycenter_euc.reshape(1, barycenter_euc.shape[0], barycenter_e
 distances_euc = np.linalg.norm(features_normalized - barycenter_euc, axis=2)
 distances_euc = np.mean(distances_euc, axis=0)
 
+idx = 0
+corr_euc, corr_fugw = {}, {}
+for task in tasks:
+    for contrast in interest[task]:
+        corr_euc_task, corr_fugw_task = list(), list()
+        for i, subject in enumerate(subjects):
+            corr_euc_task.append(np.corrcoef(features[i, idx], barycenter_euc[0, idx])[0, 1])
+            corr_fugw_task.append(np.corrcoef(features[i, idx], barycenter_fugw[idx])[0, 1])
+        corr_euc[f"{task}_{contrast}"] = np.mean(np.array(corr_euc_task))
+        corr_fugw[f"{task}_{contrast}"] = np.mean(np.array(corr_fugw_task))
+        idx += 1
+
 # Compute FUGW distances
 barycenter_fugw = barycenter_fugw.reshape(1, barycenter_fugw.shape[0], barycenter_fugw.shape[1])
 distances_fugw = np.linalg.norm(features_normalized - barycenter_fugw, axis=2)
 distances_fugw = np.mean(distances_fugw, axis=0)
 
-#%%
+# %%
 # Plot the results with grouped bar plot per task/contrast
 # Create a dataframe
 idx = 0
@@ -92,5 +104,15 @@ for task in tasks:
 df = pd.DataFrame(data, columns=['Barycenter', 'Task', 'val'])
 df.pivot(columns='Barycenter', values='val', index='Task').plot(kind='bar')
 plt.ylabel('Mean Euclidean distance to barycenter')
+
+# %%
+data = list()
+for task in tasks:
+    for contrast in interest[task]:
+        data.append(['FUGW', f"{task} - {contrast}", corr_fugw[f"{task}_{contrast}"]])
+        data.append(['Euclidean', f"{task} - {contrast}", corr_euc[f"{task}_{contrast}"]])
+df = pd.DataFrame(data, columns=['Barycenter', 'Task', 'val'])
+df.pivot(columns='Barycenter', values='val', index='Task').plot(kind='bar')
+plt.ylabel('Mean correlation to barycenter')
 
 # %%
