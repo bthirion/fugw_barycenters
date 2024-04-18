@@ -16,9 +16,9 @@ assert path.exists()
 
 N_SUBJECTS = 10
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
-ALPHA_LIST = [0.5]
-RHO = [1]
-EPS_LIST = [1e-4]
+ALPHA_LIST = [0, 0.1, 0.25, 0.5, 0.75, 0.9, 1]
+RHO = [1e-2, 1, 1e1]
+EPS_LIST = [0, 1e-6, 1e-5, 1e-4, 1e-3, 1e-2]
 
 # Get the list of subjects
 subjects = [
@@ -124,10 +124,10 @@ for alpha, rho, eps in itertools.product(ALPHA_LIST, RHO, EPS_LIST):
         features_list=features_list,
         geometry_list=[geometry_normalized],
         init_barycenter_features=euclidean_barycenter_features,
-        nits_barycenter=3,
+        nits_barycenter=4,
         solver='mm',
         solver_params={
-            'nits_bcd': 3,
+            'nits_bcd': 4,
             'nits_uot': 50,
             'eval_bcd': 1,
             'eval_uot': 1,
