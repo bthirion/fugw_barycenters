@@ -15,12 +15,10 @@ path = Path("/data/parietal/store/data/HCP900/glm/fsaverage5/")
 assert path.exists()
 
 N_SUBJECTS = 10
-DEVICE = "cuda"
-# ALPHA_LIST = [0, 0.1, 0.25, 0.5, 0.75, 0.9, 1]
+DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 ALPHA_LIST = [0.5]
-RHO = [1e6]
-# EPS_LIST = [1e-4, 1e-3, 1e-2, 1e-1]
-EPS_LIST = [1e-2]
+RHO = [1]
+EPS_LIST = [1e-4]
 
 # Get the list of subjects
 subjects = [
@@ -28,14 +26,24 @@ subjects = [
     for x in path.iterdir()
 ]
 subjects = subjects[:N_SUBJECTS]
+# interest = {
+#     'LANGUAGE': ['MATH-STORY'],
+#     'WM': ['2BK-0BK', 'BODY-AVG', 'PLACE-AVG', 'TOOL-AVG', 'FACE-AVG'],
+#     'EMOTION': ['SHAPES-FACES'],
+#     'SOCIAL': ['TOM-RANDOM'],
+#     'RELATIONAL': ['REL-MATCH'],
+#     'GAMBLING': ['PUNISH-REWARD'],
+#     'MOTOR': ['RH-AVG', 'RF-AVG', 'T-AVG', 'LH-AVG', 'LF-AVG']
+# }
 interest = {
-    'LANGUAGE': ['MATH-STORY'],
-    'WM': ['2BK-0BK', 'BODY-AVG', 'PLACE-AVG', 'TOOL-AVG', 'FACE-AVG'],
-    'EMOTION': ['SHAPES-FACES'],
-    'SOCIAL': ['TOM-RANDOM'],
-    'RELATIONAL': ['REL-MATCH'],
-    'GAMBLING': ['PUNISH-REWARD'],
-    'MOTOR': ['RH-AVG', 'RF-AVG', 'T-AVG', 'LH-AVG', 'LF-AVG']
+    'LANGUAGE': ['MATH', 'STORY'],
+    'WM': ['2BK_BODY', '2BK_PLACE', '2BK_TOOL', '2BK_FACE',
+           '0BK_BODY', '0BK_PLACE', '0BK_TOOL', '0BK_FACE'],
+    'EMOTION': ['SHAPES', 'FACES'],
+    'SOCIAL': ['TOM', 'RANDOM'],
+    'RELATIONAL': ['REL', 'MATCH'],
+    'GAMBLING': ['PUNISH', 'REWARD'],
+    'MOTOR': ['RH', 'RF', 'T', 'LH', 'LF']
 }
 tasks = list(interest.keys())
 hemi = 'left'
@@ -76,6 +84,24 @@ barycenter_path.mkdir(exist_ok=True)
 
 print("Total number of combinations: ", len(ALPHA_LIST) * len(RHO) * len(EPS_LIST))
 
+# Compute and save euclidean barycenter gifti file
+barycenter_path_hyp = barycenter_path / "euclidean"
+euclidean_barycenter_features = torch.mean(features_normalized, dim=0)
+idx = 0
+for task in tasks:
+    task_path = barycenter_path_hyp / task / "level2" / "z_maps"
+    task_path.mkdir(exist_ok=True, parents=True)
+    for contrast in interest[task]:
+        barycenter_feature = euclidean_barycenter_features[idx].cpu().numpy()
+        barycenter_feature = nib.gifti.GiftiImage(
+            darrays=[nib.gifti.GiftiDataArray(barycenter_feature)]
+        )
+        nib.save(
+            barycenter_feature,
+            task_path / f"z_{contrast}_{hemi[0]}h.gii"
+        )
+        idx += 1
+
 for alpha, rho, eps in itertools.product(ALPHA_LIST, RHO, EPS_LIST):
     print()
     start_time = time.time()
@@ -97,10 +123,11 @@ for alpha, rho, eps in itertools.product(ALPHA_LIST, RHO, EPS_LIST):
         weights_list=weights_list,
         features_list=features_list,
         geometry_list=[geometry_normalized],
+        init_barycenter_features=euclidean_barycenter_features,
         nits_barycenter=3,
         solver='mm',
         solver_params={
-            'nits_bcd': 5,
+            'nits_bcd': 3,
             'nits_uot': 50,
             'eval_bcd': 1,
             'eval_uot': 1,
@@ -110,7 +137,6 @@ for alpha, rho, eps in itertools.product(ALPHA_LIST, RHO, EPS_LIST):
     )
 
     barycenter_weights = barycenter_weights.cpu().numpy()
-    barycenter_features = barycenter_features * features_norm_factor
     barycenter_features = barycenter_features.cpu().numpy()
     barycenter_geometry = barycenter_geometry.cpu().numpy()
 
