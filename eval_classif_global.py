@@ -116,9 +116,10 @@ fsaverage5 = datasets.fetch_surf_fsaverage(mesh="fsaverage5")
 hemi = 'left'
 fig = plt.figure(figsize=(6, 20))
 q = 1
-for i in range(10):
+n_sub = 10
+for i in range(n_sub):
     data = cov_euc[i]
-    ax = fig.add_subplot(N_SUBJECTS_TEST, 2, q, projection='3d')
+    ax = fig.add_subplot(n_sub, 2, q, projection='3d')
     plot_surf(
         fsaverage5[f'pial_{hemi}'],
         data,
@@ -132,7 +133,7 @@ for i in range(10):
     q += 1
 
     data = cov_fugw[i]
-    ax = fig.add_subplot(N_SUBJECTS_TEST, 2, q, projection='3d')
+    ax = fig.add_subplot(n_sub, 2, q, projection='3d')
     plot_surf(
         fsaverage5[f'pial_{hemi}'],
         data,
