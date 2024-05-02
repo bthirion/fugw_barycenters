@@ -1,4 +1,3 @@
-# %%
 # Useful imports
 import nibabel as nib
 from nilearn import datasets, surface
@@ -12,8 +11,8 @@ from fugw.scripts import lmds
 
 # Set device
 device = torch.device("cpu")
-# if torch.cuda.is_available():
-#     device = torch.device("cuda:2")
+if torch.cuda.is_available():
+    device = torch.device("cuda:3")
 
 contrasts_path = Path("/data/parietal/store/data/HCP900/glm/fsaverage5/")
 assert contrasts_path.exists()
@@ -33,26 +32,26 @@ def load_geometry_fsaverage(mesh="fsaverage5", hemi="left"):
     fs_hemi_embedding = lmds.compute_lmds_mesh(
         coordinates,
         triangles,
-        n_landmarks=100,
-        k=3,
-        n_jobs=2,
+        n_landmarks=1000,
+        k=12,
+        n_jobs=5,
         verbose=True,
     )
 
-    source_embeddings_normalized = fs_hemi_embedding / torch.norm(
-        fs_hemi_embedding, p=2, dim=1, keepdim=True
+    source_embeddings_normalized, d_max = coarse_to_fine.random_normalizing(
+        fs_hemi_embedding
     )
 
-    return source_embeddings_normalized
+    return source_embeddings_normalized, d_max
 
 
 # List of subjects
 subjects = [x.name for x in contrasts_path.iterdir() if x.is_dir()]
-# Keep only 10 subjects
+# Keep the first 600 subjects
 subjects = subjects[:3]
 
 # Keep the same geometry for all subjects
-geometry_embedding = load_geometry_fsaverage(mesh="fsaverage5")
+geometry_embedding, d_max = load_geometry_fsaverage(mesh="fsaverage5")
 print(f"Loaded geometry embedding of shape {geometry_embedding.shape}")
 
 
@@ -64,7 +63,7 @@ mesh_sample = coarse_to_fine.sample_mesh_uniformly(
     coordinates,
     triangles,
     embeddings=geometry_embedding,
-    n_samples=500,
+    n_samples=1000,
 )
 
 
@@ -106,17 +105,50 @@ weights_list = [
 ]
 
 # Initialize the barycenter
-fugw_barycenter = FUGWSparseBarycenter()
+fugw_barycenter = FUGWSparseBarycenter(
+    alpha_coarse=0.5,
+    alpha_fine=0.5,
+    rho_coarse=1.0,
+    rho_fine=1.0,
+    eps_coarse=1.0,
+    eps_fine=1.0,
+    selection_radius=0.5 / d_max,
+)
 
 # Fit the barycenter
-fugw_barycenter.fit(
-    weights_list,
-    features_list,
-    [geometry_embedding],
-    nits_barycenter=2,
-    mesh_sample=mesh_sample,
-    coarse_mapping_solver_params={"nits_bcd": 2, "nits_uot": 10},
-    fine_mapping_solver_params={"nits_bcd": 2, "nits_uot": 10},
-    device=device,
-    verbose=True,
+(barycenter_weights, barycenter_features, barycenter_geometry, _, _, _) = (
+    fugw_barycenter.fit(
+        weights_list,
+        features_list,
+        [geometry_embedding],
+        nits_barycenter=1,
+        mesh_sample=mesh_sample,
+        coarse_mapping_solver_params={"nits_bcd": 1, "nits_uot": 1000},
+        fine_mapping_solver_params={"nits_bcd": 1, "nits_uot": 1000},
+        device=device,
+        verbose=True,
+    )
 )
+
+
+# Save the barycenter
+barycenter_path = Path("barycenters")
+barycenter_path.mkdir(exist_ok=True)
+barycenter_path_hyp = barycenter_path / f"alpha_{alpha}_rho_{rho}_eps_{eps}"
+idx = 0
+for task in tasks:
+    task_path = barycenter_path_hyp / task / "level2" / "z_maps"
+    task_path.mkdir(exist_ok=True, parents=True)
+    for contrast in interest[task]:
+        barycenter_feature = barycenter_features[idx]
+        barycenter_feature = nib.gifti.GiftiImage(
+            darrays=[nib.gifti.GiftiDataArray(barycenter_feature)]
+        )
+        nib.save(
+            barycenter_feature, task_path / f"z_{contrast}_{hemi[0]}h.gii"
+        )
+        idx += 1
+
+# Save barycenter geometry
+np.save(barycenter_path_hyp / "weights.npy", barycenter_weights)
+np.save(barycenter_path_hyp / "geometry.npy", barycenter_geometry)
